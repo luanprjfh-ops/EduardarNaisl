@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Agenda Pública • Unhas</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{
+      --bg0:#0F0029; --bg2:#1E0040; --p3:#4E0061;
+      --neon2:#BC0DD9; --blue1:#3D5BB6;
+      --text:#F3EFFF; --muted:#C9B8FF;
+      --card: rgba(255,255,255,0.06); --stroke: rgba(255,255,255,0.10);
+    }
+    body{
+      margin:0; color:var(--text); font-family: Inter, system-ui, Arial;
+      background:
+        radial-gradient(900px 500px at 15% 25%, rgba(188,13,217,0.18), transparent 60%),
+        radial-gradient(900px 500px at 70% 55%, rgba(61,91,182,0.18), transparent 60%),
+        linear-gradient(135deg, var(--bg0), var(--bg2), var(--p3));
+      min-height:100vh;
+    }
+    .wrap{max-width:900px;margin:0 auto;padding:22px;}
+    .title{font-weight:900;font-size:28px}
+    .sub{color:rgba(255,255,255,.75);margin-top:6px}
+    .card{
+      background:var(--card); border:1px solid var(--stroke); border-radius:18px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+      padding:14px 16px;
+    }
+    .list{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+    .row{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+    .badge{
+      border:1px solid rgba(61,91,182,0.5);
+      background: rgba(61,91,182,0.12);
+      padding:6px 10px; border-radius:999px; font-size:12px;
+    }
+    .price{font-weight:900;font-size:18px}
+    .hint{margin-top:10px;color:rgba(255,255,255,.6);font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">💅 Agenda Pública</div>
+    <div class="sub">Horários disponíveis e preços</div>
+
+    <div class="list" id="list"></div>
+    <div class="hint">Os horários aparecem aqui quando forem cadastrados no painel e marcados como “Publicar”.</div>
+  </div>
+
+  <script>
+    // ======== CONFIGURE AQUI ========
+    const SUPABASE_URL = "https://gmbonkieasgtfcevlsos.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_gML-mbcOr6nCQt-bNcQIWg_A9SHi38v";
+    const OWNER_ID = "5261c0e7-ecbe-42a0-9f5d-5c0b00d18494";
+    // ================================
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const list = document.getElementById("list");
+    const money = (n)=> "R$ " + Number(n||0).toFixed(2);
+
+    async function load(){
+      const { data, error } = await sb
+        .from("availability")
+        .select("start_at, price_override, services(name, price)")
+        .eq("owner_id", OWNER_ID)
+        .eq("public", true)
+        .eq("reserved", false)
+        .order("start_at", { ascending: true });
+
+      if(error){
+        list.innerHTML = `<div class="card">Erro: ${error.message}</div>`;
+        return;
+      }
+      if(!data || data.length===0){
+        list.innerHTML = `<div class="card">Nenhum horário disponível no momento.</div>`;
+        return;
+      }
+
+      list.innerHTML = data.map(s=>{
+        const dt = new Date(s.start_at).toLocaleString();
+        const serviceName = s.services?.name ?? "Serviço";
+        const price = s.price_override ?? s.services?.price ?? 0;
+
+        return `
+          <div class="card">
+            <div class="row">
+              <div>
+                <div style="font-weight:900">${dt}</div>
+                <div class="badge">${serviceName}</div>
+              </div>
+              <div class="price">${money(price)}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    load();
+  </script>
+</body>
+</html>
