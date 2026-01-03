@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Painel Administrativo • Unhas</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{
+      --bg0:#0F0029; --bg2:#1E0040; --p3:#4E0061;
+      --neon1:#6F0FCF; --neon2:#BC0DD9; --blue1:#3D5BB6;
+      --text:#F3EFFF; --muted:#C9B8FF;
+      --card: rgba(255,255,255,0.06); --stroke: rgba(255,255,255,0.10);
+    }
+    body{
+      margin:0; color:var(--text); font-family: Inter, system-ui, Arial;
+      background:
+        radial-gradient(900px 500px at 15% 25%, rgba(188,13,217,0.18), transparent 60%),
+        radial-gradient(900px 500px at 70% 55%, rgba(61,91,182,0.18), transparent 60%),
+        linear-gradient(135deg, var(--bg0), var(--bg2), var(--p3));
+      min-height:100vh;
+    }
+    .wrap{max-width:1150px;margin:0 auto;padding:18px;}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .brand{font-weight:800;font-size:20px;letter-spacing:.3px}
+    .pill{font-size:12px;color:rgba(255,255,255,.75)}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .tab{
+      border:1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.18);
+      color:var(--text); padding:9px 12px; border-radius:999px; cursor:pointer;
+    }
+    .tab.active{
+      border:1px solid rgba(188,13,217,0.45);
+      background: linear-gradient(90deg, rgba(111,15,207,0.22), rgba(188,13,217,0.12));
+      box-shadow:0 0 22px rgba(188,13,217,0.16);
+    }
+    .btn{
+      border:1px solid rgba(188,13,217,0.45);
+      background: linear-gradient(90deg, rgba(111,15,207,0.25), rgba(188,13,217,0.18));
+      color:var(--text); padding:10px 14px; border-radius:14px; cursor:pointer;
+      box-shadow:0 0 22px rgba(188,13,217,0.18);
+      transition:.2s;
+    }
+    .btn:hover{box-shadow:0 0 30px rgba(188,13,217,0.30); transform: translateY(-1px);}
+    .btn.danger{border-color: rgba(255,120,120,0.55); background: rgba(255,50,50,0.12); box-shadow:none;}
+    .btn.gray{border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); box-shadow:none;}
+    .card{
+      background:var(--card); border:1px solid var(--stroke); border-radius:18px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    }
+    .section{margin-top:12px}
+    .head{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.10)}
+    .head h2{margin:0;font-size:16px}
+    .head .sub{margin-top:4px;font-size:12px;color:rgba(255,255,255,.70)}
+    .body{padding:14px 16px}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    @media (max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
+    @media (max-width:520px){.grid{grid-template-columns:1fr}}
+    input, select, textarea{
+      width:100%;
+      padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,0.15);
+      background:rgba(0,0,0,0.25);color:var(--text);outline:none;
+    }
+    textarea{min-height:80px; resize: vertical;}
+    input:focus, select:focus, textarea:focus{border-color:rgba(61,91,182,0.6); box-shadow:0 0 0 4px rgba(61,91,182,0.16)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+    .list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+    .item{padding:12px 12px;border-radius:16px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .item .title{font-weight:800}
+    .muted{font-size:12px;color:rgba(255,255,255,0.70);margin-top:4px}
+    .msg{margin-top:10px;font-size:13px;color:rgba(255,255,255,0.80)}
+    .err{color:#ffb3b3}
+    .ok{color:#bdf7c7}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+    @media (max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}}
+    @media (max-width:520px){.stats{grid-template-columns:1fr}}
+    .stat{padding:14px}
+    .label{font-size:12px;color:rgba(255,255,255,.70)}
+    .value{font-size:24px;font-weight:900;margin-top:6px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <div class="brand">✨ Painel Administrativo • Unhas</div>
+      <div class="pill" id="who">Deslogado</div>
+    </div>
+    <div class="row">
+      <button class="btn gray" id="refreshBtn">Atualizar</button>
+      <button class="btn" id="logoutBtn">Sair</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <!-- LOGIN -->
+  <div class="section card" id="loginSection">
+    <div class="head">
+      <h2>Login</h2>
+      <div class="sub">Entre com o usuário criado no Supabase → Authentication → Users</div>
+    </div>
+    <div class="body">
+      <div class="grid">
+        <div><input id="email" placeholder="Email"/></div>
+        <div><input id="pass" type="password" placeholder="Senha"/></div>
+        <div><button class="btn" id="loginBtn">Entrar</button></div>
+        <div><div class="msg err" id="loginMsg"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="section card" id="dashSection" style="display:none;">
+    <div class="head">
+      <h2>Dashboard</h2>
+      <div class="sub">Lucro real (appointments) + lucro esperado (bookings agendados)</div>
+    </div>
+    <div class="body">
+      <div class="stats">
+        <div class="card stat"><div class="label">Hoje • Unhas</div><div class="value" id="d_count">-</div></div>
+        <div class="card stat"><div class="label">Hoje • Lucro</div><div class="value" id="d_profit">-</div></div>
+        <div class="card stat"><div class="label">Mês • Unhas</div><div class="value" id="m_count">-</div></div>
+        <div class="card stat"><div class="label">Mês • Lucro</div><div class="value" id="m_profit">-</div></div>
+        <div class="card stat"><div class="label">Ano • Unhas</div><div class="value" id="y_count">-</div></div>
+        <div class="card stat"><div class="label">Ano • Lucro</div><div class="value" id="y_profit">-</div></div>
+        <div class="card stat" style="grid-column: span 2;">
+          <div class="label">Futuro • Lucro esperado (agendados)</div>
+          <div class="value" id="expected_profit">-</div>
+          <div class="muted">Soma (expected_price - expected_cost) onde status=SCHEDULED</div>
+        </div>
+      </div>
+      <div class="msg" id="dashMsg"></div>
+    </div>
+  </div>
+
+  <!-- CLIENTES -->
+  <div class="section card" id="clientsSection" style="display:none;">
+    <div class="head">
+      <h2>Cadastrar clientes</h2>
+      <div class="sub">Adiciona cliente e cria fidelidade automaticamente</div>
+    </div>
+    <div class="body">
+      <div class="grid">
+        <div><input id="c_name" placeholder="Nome"/></div>
+        <div><input id="c_phone" placeholder="Telefone/WhatsApp"/></div>
+        <div><input id="c_insta" placeholder="Instagram (opcional)"/></div>
+        <div><button class="btn" id="c_add">Salvar cliente</button></div>
+      </div>
+      <div style="margin-top:10px" class="grid">
+        <div style="grid-column: span 2;"><input id="c_search" placeholder="Buscar cliente por nome/telefone..."/></div>
+        <div style="grid-column: span 2;"><div class="msg" id="c_msg"></div></div>
+      </div>
+      <div class="list" id="c_list"></div>
+    </div>
+  </div>
+
+  <!-- SERVIÇOS -->
+  <div class="section card" id="servicesSection" style="display:none;">
+    <div class="head">
+      <h2>Cadastrar serviços</h2>
+      <div class="sub">Preço e custo pra calcular lucro</div>
+    </div>
+    <div class="body">
+      <div class="grid">
+        <div><input id="s_name" placeholder="Nome do serviço"/></div>
+        <div><input id="s_price" placeholder="Preço (ex: 120)"/></div>
+        <div><input id="s_cost" placeholder="Custo material (ex: 30)"/></div>
+        <div><button class="btn" id="s_add">Salvar serviço</button></div>
+      </div>
+      <div class="msg" id="s_msg"></div>
+      <div class="list" id="s_list"></div>
+    </div>
+  </div>
+
+  <!-- DIAS DISPONÍVEIS -->
+  <div class="section card" id="availSection" style="display:none;">
+    <div class="head">
+      <h2>Cadastrar dias disponíveis</h2>
+      <div class="sub">Isso é o que aparece no sistema público (public/ocultar)</div>
+    </div>
+    <div class="body">
+      <div class="grid">
+        <div><input id="a_date" type="date"/></div>
+        <div><input id="a_time" type="time"/></div>
+        <div><select id="a_service"></select></div>
+        <div><input id="a_override" placeholder="Preço override (opcional)"/></div>
+      </div>
+      <div style="margin-top:10px" class="row">
+        <button class="btn" id="a_add">Adicionar horário</button>
+        <div class="msg" id="a_msg"></div>
+      </div>
+      <div class="list" id="a_list"></div>
+    </div>
+  </div>
+
+  <!-- AGENDA FUTURA -->
+  <div class="section card" id="bookSection" style="display:none;">
+    <div class="head">
+      <h2>Agenda futura (registrar futuras unhas)</h2>
+      <div class="sub">Registra agendamento e mostra lucro esperado</div>
+    </div>
+    <div class="body">
+      <div class="grid">
+        <div><select id="b_client"></select></div>
+        <div><select id="b_service"></select></div>
+        <div><input id="b_date" type="date"/></div>
+        <div><input id="b_time" type="time"/></div>
+      </div>
+      <div style="margin-top:10px" class="grid">
+        <div><input id="b_price" placeholder="Preço previsto (auto)"/></div>
+        <div><input id="b_cost" placeholder="Custo previsto (auto)"/></div>
+        <div><button class="btn" id="b_add">Salvar agendamento</button></div>
+        <div><div class="msg" id="b_msg"></div></div>
+      </div>
+      <div class="list" id="b_list"></div>
+    </div>
+  </div>
+
+  <!-- FINALIZAR -->
+  <div class="section card" id="finalSection" style="display:none;">
+    <div class="head">
+      <h2>Finalizar unha (registrar atendimento feito)</h2>
+      <div class="sub">Escolha um agendamento futuro ou finalize manualmente</div>
+    </div>
+    <div class="body">
+      <div class="grid">
+        <div style="grid-column: span 2;"><select id="f_booking"></select></div>
+        <div><select id="f_pay">
+          <option>Pix</option><option>Dinheiro</option><option>Crédito</option><option>Débito</option><option>Outros</option>
+        </select></div>
+        <div><button class="btn" id="f_useBooking">Carregar do agendamento</button></div>
+      </div>
+
+      <div style="margin-top:10px" class="grid">
+        <div><select id="f_client"></select></div>
+        <div><select id="f_service"></select></div>
+        <div><input id="f_price" placeholder="Valor cobrado"/></div>
+        <div><input id="f_cost" placeholder="Custo material"/></div>
+      </div>
+
+      <div style="margin-top:10px" class="grid">
+        <div style="grid-column: span 2;"><textarea id="f_notes" placeholder="Observações (opcional)"></textarea></div>
+        <div><input id="f_points" placeholder="Pontos fidelidade (+) ex: 1" value="1"/></div>
+        <div><button class="btn" id="f_done">Finalizar agora</button></div>
+      </div>
+
+      <div class="msg" id="f_msg"></div>
+    </div>
+  </div>
+
+  <!-- FIDELIDADE -->
+  <div class="section card" id="loySection" style="display:none;">
+    <div class="head">
+      <h2>Fidelidade</h2>
+      <div class="sub">Visualizar pontos por cliente</div>
+    </div>
+    <div class="body">
+      <div class="grid">
+        <div style="grid-column: span 2;"><input id="l_search" placeholder="Buscar cliente..."/></div>
+        <div style="grid-column: span 2;"><div class="msg" id="l_msg"></div></div>
+      </div>
+      <div class="list" id="l_list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ======== CONFIGURE AQUI ========
+  const SUPABASE_URL = "https://gmbonkieasgtfcevlsos.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_gML-mbcOr6nCQt-bNcQIWg_A9SHi38v";
+  // ================================
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = (id)=>document.getElementById(id);
+  const money = (n)=> "R$ " + Number(n||0).toFixed(2);
+  const num = (v)=> Number(String(v||"0").replace(",", ".") || 0);
+
+  const tabs = [
+    { id:"dashSection", label:"Dashboard" },
+    { id:"clientsSection", label:"Clientes" },
+    { id:"servicesSection", label:"Serviços" },
+    { id:"availSection", label:"Dias disponíveis" },
+    { id:"bookSection", label:"Agenda futura" },
+    { id:"finalSection", label:"Finalizar unha" },
+    { id:"loySection", label:"Fidelidade" },
+  ];
+
+  function showTab(sectionId){
+    for(const t of tabs){
+      $(t.id).style.display = (t.id === sectionId) ? "block" : "none";
+    }
+    document.querySelectorAll(".tab").forEach(el=>{
+      el.classList.toggle("active", el.dataset.target === sectionId);
+    });
+  }
+
+  function buildTabs(){
+    const el = $("tabs");
+    el.innerHTML = tabs.map(t=>`<button class="tab" data-target="${t.id}">${t.label}</button>`).join("");
+    el.querySelectorAll(".tab").forEach(btn=>{
+      btn.onclick = async ()=> {
+        showTab(btn.dataset.target);
+        await refreshAll(); // mantém tudo atualizado
+      };
+    });
+    showTab("dashSection");
+  }
+  buildTabs();
+
+  // ========= AUTH =========
+  async function refreshAuth(){
+    const { data: { user } } = await sb.auth.getUser();
+    $("who").textContent = user ? `Logado: ${user.email}` : "Deslogado";
+    $("loginSection").style.display = user ? "none" : "block";
+    $("tabs").style.display = user ? "flex" : "none";
+    for(const t of tabs){ $(t.id).style.display = user ? $(t.id).style.display : "none"; }
+    if(!user) return false;
+    return true;
+  }
+
+  $("loginBtn").onclick = async ()=>{
+    $("loginMsg").textContent = "";
+    const email = $("email").value.trim();
+    const password = $("pass").value;
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error) $("loginMsg").textContent = error.message;
+    await refreshAll();
+  };
+
+  $("logoutBtn").onclick = async ()=>{
+    await sb.auth.signOut();
+    await refreshAll();
+  };
+
+  $("refreshBtn").onclick = async ()=> refreshAll();
+
+  sb.auth.onAuthStateChange(()=>refreshAll());
+
+  // ========= LOADERS (cache) =========
+  let CACHE = { user:null, clients:[], services:[], bookings:[] };
+
+  async function loadUser(){
+    const { data: { user } } = await sb.auth.getUser();
+    CACHE.user = user;
+    return user;
+  }
+
+  async function loadClients(){
+    const user = CACHE.user;
+    if(!user) return [];
+    const { data, error } = await sb.from("clients")
+      .select("id,name,phone,instagram,notes,created_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending:false });
+    if(error) { $("c_msg").textContent = error.message; return []; }
+    CACHE.clients = data || [];
+    return CACHE.clients;
+  }
+
+  async function loadServices(){
+    const user = CACHE.user;
+    if(!user) return [];
+    const { data, error } = await sb.from("services")
+      .select("id,name,price,material_cost,active,created_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending:false });
+    if(error) { $("s_msg").textContent = error.message; return []; }
+    CACHE.services = data || [];
+    return CACHE.services;
+  }
+
+  async function loadBookings(){
+    const user = CACHE.user;
+    if(!user) return [];
+    const { data, error } = await sb.from("bookings")
+      .select("id,start_at,status,expected_price,expected_cost,client_id,service_id")
+      .eq("owner_id", user.id)
+      .order("start_at", { ascending:true });
+    if(error) { $("b_msg").textContent = error.message; return []; }
+    CACHE.bookings = data || [];
+    return CACHE.bookings;
+  }
+
+  // ========= UI helpers =========
+  function fillClientSelect(selectId, allowEmpty=true){
+    const sel = $(selectId);
+    const opts = [];
+    if(allowEmpty) opts.push(`<option value="">Selecione cliente</option>`);
+    for(const c of CACHE.clients){
+      opts.push(`<option value="${c.id}">${c.name}${c.phone ? " • "+c.phone : ""}</option>`);
+    }
+    sel.innerHTML = opts.join("");
+  }
+
+  function fillServiceSelect(selectId, allowEmpty=true){
+    const sel = $(selectId);
+    const opts = [];
+    if(allowEmpty) opts.push(`<option value="">Selecione serviço</option>`);
+    for(const s of CACHE.services.filter(x=>x.active)){
+      opts.push(`<option value="${s.id}">${s.name} (R$ ${Number(s.price).toFixed(2)})</option>`);
+    }
+    sel.innerHTML = opts.join("");
+  }
+
+  // ========= DASHBOARD =========
+  function startOfDay(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
+  function startOfMonth(d){ return startOfDay(new Date(d.getFullYear(), d.getMonth(), 1)); }
+  function startOfYear(d){ return startOfDay(new Date(d.getFullYear(), 0, 1)); }
+
+  async function renderDashboard(){
+    const user = CACHE.user;
+    if(!user) return;
+
+    const { data: appts, error } = await sb.from("appointments")
+      .select("done_at, profit")
+      .eq("owner_id", user.id);
+    if(error){ $("dashMsg").textContent = error.message; return; }
+
+    const now = new Date();
+    const day0 = startOfDay(now);
+    const month0 = startOfMonth(now);
+    const year0 = startOfYear(now);
+
+    const bucket = (fromDate)=>{
+      const rows = (appts||[]).filter(r => new Date(r.done_at) >= fromDate);
+      return { count: rows.length, profit: rows.reduce((a,r)=>a + Number(r.profit||0), 0) };
+    };
+
+    const d = bucket(day0), m=bucket(month0), y=bucket(year0);
+    $("d_count").textContent = d.count;
+    $("d_profit").textContent = money(d.profit);
+    $("m_count").textContent = m.count;
+    $("m_profit").textContent = money(m.profit);
+    $("y_count").textContent = y.count;
+    $("y_profit").textContent = money(y.profit);
+
+    // lucro esperado: bookings SCHEDULED
+    const { data: bks, error: e2 } = await sb.from("bookings")
+      .select("expected_price, expected_cost, status")
+      .eq("owner_id", user.id)
+      .eq("status", "SCHEDULED");
+    if(e2){ $("dashMsg").textContent = e2.message; return; }
+    const exp = (bks||[]).reduce((a,r)=>a + (Number(r.expected_price||0) - Number(r.expected_cost||0)), 0);
+    $("expected_profit").textContent = money(exp);
+    $("dashMsg").textContent = "";
+  }
+
+  // ========= CLIENTS =========
+  function renderClients(){
+    const q = ($("c_search").value || "").toLowerCase();
+    const rows = CACHE.clients.filter(c =>
+      (c.name||"").toLowerCase().includes(q) || (c.phone||"").toLowerCase().includes(q)
+    );
+
+    $("c_list").innerHTML = rows.map(c=>`
+      <div class="item">
+        <div>
+          <div class="title">${c.name}</div>
+          <div class="muted">${c.phone || "-"} • ${c.instagram || "-"} </div>
+        </div>
+        <div class="row">
+          <button class="btn danger" onclick="delClient('${c.id}')">Excluir</button>
+        </div>
+      </div>
+    `).join("") || `<div class="muted">Nenhum cliente.</div>`;
+  }
+
+  async function addClient(){
+    $("c_msg").textContent = "";
+    const name = $("c_name").value.trim();
+    const phone = $("c_phone").value.trim() || null;
+    const instagram = $("c_insta").value.trim() || null;
+    if(!name) return $("c_msg").textContent = "Informe o nome.";
+    const { error } = await sb.from("clients").insert({ name, phone, instagram, notes: null });
+    if(error) return $("c_msg").textContent = error.message;
+    $("c_name").value=""; $("c_phone").value=""; $("c_insta").value="";
+    await loadClients();
+    fillClientSelect("b_client"); fillClientSelect("f_client"); fillClientSelect("l_search"); // l_search é input, ignore
+    renderClients();
+    $("c_msg").textContent = "✅ Cliente salvo!";
+    $("c_msg").className = "msg ok";
+  }
+
+  async function delClient(id){
+    if(!confirm("Excluir cliente?")) return;
+    const { error } = await sb.from("clients").delete().eq("id", id);
+    if(error) { $("c_msg").textContent = error.message; return; }
+    await loadClients();
+    renderClients();
+  }
+
+  window.delClient = delClient;
+
+  $("c_add").onclick = addClient;
+  $("c_search").oninput = renderClients;
+
+  // ========= SERVICES =========
+  function renderServices(){
+    $("s_list").innerHTML = CACHE.services.map(s=>{
+      const lucro = Number(s.price||0) - Number(s.material_cost||0);
+      return `
+        <div class="item">
+          <div>
+            <div class="title">${s.name} ${s.active ? "" : "<span class='muted'>(inativo)</span>"}</div>
+            <div class="muted">Preço: ${money(s.price)} • Custo: ${money(s.material_cost)} • Lucro: ${money(lucro)}</div>
+          </div>
+          <div class="row">
+            <button class="btn gray" onclick="toggleService('${s.id}', ${s.active})">${s.active ? "Desativar" : "Ativar"}</button>
+            <button class="btn danger" onclick="delService('${s.id}')">Excluir</button>
+          </div>
+        </div>
+      `;
+    }).join("") || `<div class="muted">Nenhum serviço.</div>`;
+  }
+
+  async function addService(){
+    $("s_msg").textContent = "";
+    const name = $("s_name").value.trim();
+    const price = num($("s_price").value);
+    const cost = num($("s_cost").value);
+    if(!name) return $("s_msg").textContent = "Informe o nome do serviço.";
+    const { error } = await sb.from("services").insert({ name, price, material_cost: cost, active:true });
+    if(error) return $("s_msg").textContent = error.message;
+    $("s_name").value=""; $("s_price").value=""; $("s_cost").value="";
+    await loadServices();
+    fillServiceSelect("a_service"); fillServiceSelect("b_service"); fillServiceSelect("f_service");
+    renderServices();
+    $("s_msg").textContent = "✅ Serviço salvo!";
+    $("s_msg").className = "msg ok";
+  }
+
+  async function toggleService(id, active){
+    const { error } = await sb.from("services").update({ active: !active }).eq("id", id);
+    if(error) { $("s_msg").textContent = error.message; return; }
+    await loadServices();
+    fillServiceSelect("a_service"); fillServiceSelect("b_service"); fillServiceSelect("f_service");
+    renderServices();
+  }
+  async function delService(id){
+    if(!confirm("Excluir serviço?")) return;
+    const { error } = await sb.from("services").delete().eq("id", id);
+    if(error) { $("s_msg").textContent = error.message; return; }
+    await loadServices();
+    fillServiceSelect("a_service"); fillServiceSelect("b_service"); fillServiceSelect("f_service");
+    renderServices();
+  }
+  window.toggleService = toggleService;
+  window.delService = delService;
+
+  $("s_add").onclick = addService;
+
+  // ========= AVAILABILITY =========
+  async function renderAvailability(){
+    const user = CACHE.user;
+    if(!user) return;
+    const { data, error } = await sb.from("availability")
+      .select("id,start_at,public,reserved,price_override, service_id, services(name,price,material_cost)")
+      .eq("owner_id", user.id)
+      .order("start_at", { ascending:true });
+    if(error){ $("a_msg").textContent = error.message; return; }
+
+    $("a_list").innerHTML = (data||[]).map(r=>{
+      const dt = new Date(r.start_at).toLocaleString();
+      const sname = r.services?.name || "Serviço";
+      const price = r.price_override ?? r.services?.price ?? 0;
+      return `
+        <div class="item">
+          <div>
+            <div class="title">${dt} • ${sname}</div>
+            <div class="muted">Preço: ${money(price)} • Público: ${r.public ? "SIM" : "NÃO"} • Reservado: ${r.reserved ? "SIM" : "NÃO"}</div>
+          </div>
+          <div class="row">
+            <button class="btn gray" onclick="toggleAvail('${r.id}', ${r.public})">${r.public ? "Ocultar" : "Publicar"}</button>
+            <button class="btn danger" onclick="delAvail('${r.id}')">Excluir</button>
+          </div>
+        </div>
+      `;
+    }).join("") || `<div class="muted">Nenhum horário cadastrado.</div>`;
+  }
+
+  async function addAvail(){
+    $("a_msg").textContent = "";
+    const date = $("a_date").value;
+    const time = $("a_time").value;
+    const service_id = $("a_service").value || null;
+    const price_override = $("a_override").value.trim() ? num($("a_override").value) : null;
+
+    if(!date || !time) return $("a_msg").textContent = "Selecione data e hora.";
+    if(!service_id) return $("a_msg").textContent = "Selecione o serviço.";
+
+    const start_at = new Date(`${date}T${time}:00`).toISOString();
+    const { error } = await sb.from("availability").insert({
+      start_at, service_id, price_override, public:true, reserved:false
+    });
+    if(error) return $("a_msg").textContent = error.message;
+
+    $("a_override").value = "";
+    $("a_msg").textContent = "✅ Horário adicionado!";
+    $("a_msg").className = "msg ok";
+    await renderAvailability();
+  }
+
+  async function toggleAvail(id, curPublic){
+    const { error } = await sb.from("availability").update({ public: !curPublic }).eq("id", id);
+    if(error) { $("a_msg").textContent = error.message; return; }
+    await renderAvailability();
+  }
+  async function delAvail(id){
+    if(!confirm("Excluir horário?")) return;
+    const { error } = await sb.from("availability").delete().eq("id", id);
+    if(error) { $("a_msg").textContent = error.message; return; }
+    await renderAvailability();
+  }
+  window.toggleAvail = toggleAvail;
+  window.delAvail = delAvail;
+
+  $("a_add").onclick = addAvail;
+
+  // ========= BOOKINGS (AGENDA FUTURA) =========
+  function serviceById(id){ return CACHE.services.find(s=>s.id===id); }
+  function clientById(id){ return CACHE.clients.find(c=>c.id===id); }
+
+  function renderBookingsList(rows){
+    $("b_list").innerHTML = rows.map(b=>{
+      const c = clientById(b.client_id);
+      const s = serviceById(b.service_id);
+      const dt = new Date(b.start_at).toLocaleString();
+      const exp = Number(b.expected_price||0) - Number(b.expected_cost||0);
+      return `
+        <div class="item">
+          <div>
+            <div class="title">${dt} • ${(c?.name||"Cliente")} • ${(s?.name||"Serviço")}</div>
+            <div class="muted">Status: ${b.status} • Previsto: ${money(b.expected_price)} • Custo: ${money(b.expected_cost)} • Lucro: ${money(exp)}</div>
+          </div>
+          <div class="row">
+            ${b.status==="SCHEDULED"
+              ? `<button class="btn danger" onclick="cancelBooking('${b.id}')">Cancelar</button>`
+              : `<button class="btn gray" disabled>—</button>`
+            }
+          </div>
+        </div>
+      `;
+    }).join("") || `<div class="muted">Nenhum agendamento.</div>`;
+  }
+
+  async function addBooking(){
+    $("b_msg").textContent = "";
+    const client_id = $("b_client").value;
+    const service_id = $("b_service").value;
+    const date = $("b_date").value;
+    const time = $("b_time").value;
+    const expected_price = num($("b_price").value);
+    const expected_cost = num($("b_cost").value);
+
+    if(!client_id) return $("b_msg").textContent = "Selecione o cliente.";
+    if(!service_id) return $("b_msg").textContent = "Selecione o serviço.";
+    if(!date || !time) return $("b_msg").textContent = "Selecione data e hora.";
+
+    const start_at = new Date(`${date}T${time}:00`).toISOString();
+    const { error } = await sb.from("bookings").insert({
+      client_id, service_id, start_at,
+      expected_price, expected_cost, status:"SCHEDULED"
+    });
+    if(error) return $("b_msg").textContent = error.message;
+
+    $("b_msg").textContent = "✅ Agendamento salvo!";
+    $("b_msg").className = "msg ok";
+    await loadBookings();
+    renderBookingsList(CACHE.bookings);
+    await refreshFinalizeBookingSelect();
+  }
+
+  async function cancelBooking(id){
+    if(!confirm("Cancelar agendamento?")) return;
+    const { error } = await sb.from("bookings").update({ status:"CANCELLED" }).eq("id", id);
+    if(error) { $("b_msg").textContent = error.message; return; }
+    await loadBookings();
+    renderBookingsList(CACHE.bookings);
+    await refreshFinalizeBookingSelect();
+  }
+  window.cancelBooking = cancelBooking;
+
+  // auto preencher preço/custo ao escolher serviço
+  $("b_service").onchange = ()=>{
+    const s = serviceById($("b_service").value);
+    if(!s) return;
+    $("b_price").value = String(Number(s.price||0).toFixed(2));
+    $("b_cost").value = String(Number(s.material_cost||0).toFixed(2));
+  };
+
+  $("b_add").onclick = addBooking;
+
+  // ========= FINALIZE =========
+  async function refreshFinalizeBookingSelect(){
+    const scheduled = CACHE.bookings.filter(b=>b.status==="SCHEDULED").slice(0,200);
+    $("f_booking").innerHTML = [`<option value="">(Opcional) Escolha um agendamento</option>`].concat(
+      scheduled.map(b=>{
+        const c = clientById(b.client_id);
+        const s = serviceById(b.service_id);
+        return `<option value="${b.id}">${new Date(b.start_at).toLocaleString()} • ${(c?.name||"Cliente")} • ${(s?.name||"Serviço")}</option>`;
+      })
+    ).join("");
+  }
+
+  $("f_useBooking").onclick = ()=>{
+    $("f_msg").textContent = "";
+    const id = $("f_booking").value;
+    if(!id) return $("f_msg").textContent = "Selecione um agendamento (ou finalize manual).";
+    const b = CACHE.bookings.find(x=>x.id===id);
+    if(!b) return;
+    $("f_client").value = b.client_id || "";
+    $("f_service").value = b.service_id || "";
+    $("f_price").value = String(Number(b.expected_price||0).toFixed(2));
+    $("f_cost").value = String(Number(b.expected_cost||0).toFixed(2));
+  };
+
+  async function addLoyaltyPoints(client_id, points){
+    // soma pontos na tabela loyalty (já existe por trigger, mas garantimos)
+    const user = CACHE.user;
+    if(!user || !client_id || !points) return;
+
+    // tenta update direto
+    const { data: row } = await sb.from("loyalty").select("id,points").eq("owner_id", user.id).eq("client_id", client_id).maybeSingle();
+    if(row?.id){
+      await sb.from("loyalty").update({ points: Number(row.points||0) + points, updated_at: new Date().toISOString() }).eq("id", row.id);
+    }else{
+      await sb.from("loyalty").insert({ owner_id: user.id, client_id, points, updated_at: new Date().toISOString() });
+    }
+  }
+
+  async function finalizeNow(){
+    $("f_msg").textContent = "";
+    const booking_id = $("f_booking").value || null;
+    const client_id = $("f_client").value || null;
+    const service_id = $("f_service").value || null;
+    const charged_price = num($("f_price").value);
+    const material_cost = num($("f_cost").value);
+    const payment_method = $("f_pay").value;
+    const notes = $("f_notes").value.trim() || null;
+    const points = parseInt($("f_points").value || "0", 10) || 0;
+
+    if(!client_id) return $("f_msg").textContent = "Selecione o cliente.";
+    if(!service_id) return $("f_msg").textContent = "Selecione o serviço.";
+
+    const { error } = await sb.from("appointments").insert({
+      booking_id, client_id, service_id,
+      done_at: new Date().toISOString(),
+      charged_price, material_cost,
+      payment_method, notes
+      // profit é calculado por trigger
+    });
+    if(error) return $("f_msg").textContent = error.message;
+
+    // se veio de booking, marca DONE
+    if(booking_id){
+      await sb.from("bookings").update({ status:"DONE" }).eq("id", booking_id);
+    }
+
+    // fidelidade
+    if(points > 0) await addLoyaltyPoints(client_id, points);
+
+    $("f_msg").textContent = "✅ Atendimento finalizado!";
+    $("f_msg").className = "msg ok";
+    $("f_notes").value = "";
+
+    await loadBookings();
+    await refreshFinalizeBookingSelect();
+    await renderDashboard();
+    await renderLoyalty();
+  }
+
+  $("f_done").onclick = finalizeNow;
+
+  // ========= LOYALTY =========
+  async function renderLoyalty(){
+    const user = CACHE.user;
+    if(!user) return;
+    const { data, error } = await sb.from("loyalty")
+      .select("points, client_id, updated_at, clients(name, phone)")
+      .eq("owner_id", user.id)
+      .order("updated_at", { ascending:false });
+    if(error){ $("l_msg").textContent = error.message; return; }
+
+    const q = ($("l_search").value || "").toLowerCase();
+    const rows = (data||[]).filter(r => (r.clients?.name||"").toLowerCase().includes(q));
+
+    $("l_list").innerHTML = rows.map(r=>`
+      <div class="item">
+        <div>
+          <div class="title">${r.clients?.name || "Cliente"}</div>
+          <div class="muted">${r.clients?.phone || "-"}</div>
+        </div>
+        <div class="value" style="font-size:20px;">${r.points || 0} pts</div>
+      </div>
+    `).join("") || `<div class="muted">Sem pontos cadastrados.</div>`;
+  }
+  $("l_search").oninput = renderLoyalty;
+
+  // ========= REFRESH ALL =========
+  async function refreshAll(){
+    const ok = await refreshAuth();
+    await loadUser();
+
+    if(!ok) return;
+
+    // carrega base
+    await loadClients();
+    await loadServices();
+    await loadBookings();
+
+    // preenche selects
+    fillClientSelect("b_client");
+    fillClientSelect("f_client");
+    fillServiceSelect("a_service");
+    fillServiceSelect("b_service");
+    fillServiceSelect("f_service");
+
+    // render sections
+    renderClients();
+    renderServices();
+    await renderAvailability();
+    renderBookingsList(CACHE.bookings);
+    await refreshFinalizeBookingSelect();
+    await renderLoyalty();
+    await renderDashboard();
+  }
+
+  // Boot
+  refreshAll();
+</script>
+</body>
+</html>
