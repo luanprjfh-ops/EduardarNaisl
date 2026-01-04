@@ -495,7 +495,13 @@
   $("magicBtn").onclick = async ()=>{
     const email = $("email").value.trim();
     if(!email) return toast("warn","Informe o email","Digite o email e tente novamente.");
-    const { error } = await sb.auth.signInWithOtp({ email });
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: {
+        // GitHub Pages está em /EduardarNaisl/; redirecione sempre para o Admin.html correto
+        emailRedirectTo: PUBLIC_URL + "Admin.html"
+      }
+    });
     if(error) return toast("err","Falha ao enviar link", error.message);
     toast("ok","Link enviado","Confira o email para entrar.");
   };
