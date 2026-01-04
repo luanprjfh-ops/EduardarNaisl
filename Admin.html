@@ -322,7 +322,7 @@
       </div>
     </section>
 
-    <!-- AGENDA FUTURA (manual) -->
+    <!-- AGENDA FUTURA -->
     <section class="card hidden" id="bookSection">
       <div class="cardhead">
         <div>
@@ -401,6 +401,11 @@
   const SUPABASE_URL = "https://gmbonkieasgtfcevlsos.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_gML-mbcOr6nCQt-bNcQIWg_A9SHi38v";
 
+  // Ajuste aqui para o seu GitHub Pages
+  const PUBLIC_URL = "https://luanprjfh-ops.github.io/EduardarNaisl/";
+  const ADMIN_FILE = "Admin.html";
+  // ===============================
+
   // IMPORTANTE: forçar persistência e detectar sessão na URL
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
@@ -409,11 +414,6 @@
       detectSessionInUrl: true
     }
   });
-
-  // Ajuste aqui para o seu GitHub Pages
-  const PUBLIC_URL = "https://luanprjfh-ops.github.io/EduardarNaisl/";
-  const ADMIN_FILE = "Admin.html";
-  // ===============================
 
   const $ = (id)=>document.getElementById(id);
   const money = (n)=> "R$ " + Number(n||0).toFixed(2);
@@ -444,7 +444,7 @@
     `;
     el.querySelector(".x").onclick = ()=> el.remove();
     wrap.appendChild(el);
-    setTimeout(()=>{ if(el.isConnected) el.remove(); }, 4500);
+    setTimeout(()=>{ if(el.isConnected) el.remove(); }, 5200);
   }
 
   function hideAllPages(){
@@ -489,49 +489,76 @@
 
   let CACHE = { user:null, clients:[], services:[], bookings:[] };
 
-  // ====== FIX DO MAGIC LINK / REDIRECT ======
+  // ====== FIX DEFINITIVO: MAGIC LINK / HASH / QUERY ======
   async function handleAuthRedirect(){
-    const url = new URL(window.location.href);
-    const qs = url.searchParams;
+    try{
+      const url = new URL(window.location.href);
+      const qs = url.searchParams;
 
-    const token_hash = qs.get("token_hash");
-    const type = qs.get("type"); // magiclink / recovery / invite
-    const code = qs.get("code");
+      // hash (#a=b&c=d)
+      const hashRaw = (window.location.hash || "").replace(/^#/, "");
+      const hs = new URLSearchParams(hashRaw);
 
-    // Caso 1: Magic Link (token_hash + type)
-    if(token_hash && type){
-      const { error } = await sb.auth.verifyOtp({ type, token_hash });
-      if(error){
-        toast("err","Magic Link", error.message);
-      }else{
-        toast("ok","Magic Link","Sessão aplicada com sucesso.");
+      // limpeza segura: remove query + hash
+      const cleanupUrl = ()=>{
+        window.history.replaceState({}, document.title, url.pathname);
+      };
+
+      // 0) erros (se vierem na URL)
+      const errDesc = qs.get("error_description") || hs.get("error_description");
+      if(errDesc){
+        toast("err","Auth", decodeURIComponent(errDesc));
+        cleanupUrl();
+        return;
       }
-      qs.delete("token_hash");
-      qs.delete("type");
-      qs.delete("redirect_to");
-      window.history.replaceState({}, document.title, url.pathname + (qs.toString() ? ("?" + qs.toString()) : ""));
-    }
 
-    // Caso 2: PKCE (code)
-    if(code){
-      const { error } = await sb.auth.exchangeCodeForSession(code);
-      if(error){
-        toast("err","Login (code)", error.message);
-      }else{
-        toast("ok","Login","Sessão aplicada com sucesso.");
+      // 1) Formato mais comum: #access_token=...&refresh_token=...
+      const access_token = hs.get("access_token");
+      const refresh_token = hs.get("refresh_token");
+      if(access_token && refresh_token){
+        const { error } = await sb.auth.setSession({ access_token, refresh_token });
+        if(error){
+          toast("err","Magic Link", error.message);
+        }else{
+          toast("ok","Magic Link","Sessão aplicada (hash).");
+        }
+        cleanupUrl();
+        return;
       }
-      qs.delete("code");
-      qs.delete("next");
-      window.history.replaceState({}, document.title, url.pathname + (qs.toString() ? ("?" + qs.toString()) : ""));
-    }
 
-    // Se tiver erro na URL (alguns casos)
-    const errDesc = qs.get("error_description");
-    if(errDesc){
-      toast("err","Auth", decodeURIComponent(errDesc));
+      // 2) OTP: token_hash + type (pode vir no ? ou no #)
+      const token_hash = qs.get("token_hash") || hs.get("token_hash");
+      const type = qs.get("type") || hs.get("type");
+      if(token_hash && type){
+        const { error } = await sb.auth.verifyOtp({ type, token_hash });
+        if(error){
+          toast("err","Magic Link", error.message);
+        }else{
+          toast("ok","Magic Link","Sessão aplicada (otp).");
+        }
+        cleanupUrl();
+        return;
+      }
+
+      // 3) PKCE: ?code=
+      const code = qs.get("code") || hs.get("code");
+      if(code){
+        const { error } = await sb.auth.exchangeCodeForSession(code);
+        if(error){
+          toast("err","Login", error.message);
+        }else{
+          toast("ok","Login","Sessão aplicada (code).");
+        }
+        cleanupUrl();
+        return;
+      }
+
+      // Se não veio nada, ok (carregamento normal)
+    }catch(e){
+      toast("err","Auth Redirect", e?.message || String(e));
     }
   }
-  // ==========================================
+  // =======================================================
 
   async function loadUser(){
     const { data: { user } } = await sb.auth.getUser();
@@ -569,11 +596,14 @@
 
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: PUBLIC_URL + ADMIN_FILE }
+      options: {
+        // IMPORTANTE: redirect exato do Admin
+        emailRedirectTo: PUBLIC_URL + ADMIN_FILE
+      }
     });
 
     if(error) return toast("err","Falha ao enviar link", error.message);
-    toast("ok","Link enviado","Abra o link no mesmo dispositivo/navegador onde quer ficar logado.");
+    toast("ok","Link enviado","Abra o link no navegador (não dentro do app).");
   };
 
   $("logoutBtn").onclick = async ()=>{
@@ -583,7 +613,15 @@
   };
 
   $("refreshBtn").onclick = async ()=> refreshAll();
-  sb.auth.onAuthStateChange(()=>refreshAll());
+
+  // Proteção contra loop: evita refreshAll em cascata em alguns browsers
+  let _authEvtLock = false;
+  sb.auth.onAuthStateChange(async ()=>{
+    if(_authEvtLock) return;
+    _authEvtLock = true;
+    try{ await refreshAll(); }
+    finally{ setTimeout(()=>_authEvtLock=false, 250); }
+  });
 
   async function loadClients(){
     const user = CACHE.user;
@@ -831,7 +869,6 @@
   window.toggleAvail = toggleAvail; window.delAvail = delAvail;
   $("a_add").onclick = addAvail;
 
-  // ======= AGENDA FUTURA (LISTA) =======
   function renderBookingsList(rows){
     $("b_list").innerHTML = rows.map(b=>{
       const c = clientById(b.client_id), s = serviceById(b.service_id);
@@ -854,7 +891,6 @@
     }).join("") || `<div class="muted">Nenhum agendamento.</div>`;
   }
 
-  // ======= AGENDAMENTOS ONLINE =======
   function renderOnlineBookings(){
     const rows = CACHE.bookings
       .filter(b => b.status === "SCHEDULED")
@@ -886,7 +922,6 @@
   async function goFinalize(bookingId){
     try{
       setPage("finalSection");
-      // NÃO chama refreshAll completo aqui (evita flicker); só garante dropdown atualizado:
       await loadBookings();
       await refreshFinalizeBookingSelect();
 
@@ -1041,7 +1076,7 @@
   $("l_search").oninput = renderLoyalty;
 
   async function refreshAll(){
-    // 1) aplica sessão se veio do link
+    // 1) aplica sessão se veio do link (hash/query)
     await handleAuthRedirect();
 
     // 2) carrega usuário
