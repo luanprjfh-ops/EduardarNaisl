@@ -29,14 +29,11 @@
       overflow-x:hidden;
     }
 
-    /* Estado de segurança: começa SEMPRE escondendo o painel */
     .hidden{display:none !important}
 
-    /* Layout */
     .app{min-height:100%;display:grid;grid-template-columns:280px 1fr}
     @media (max-width:980px){.app{grid-template-columns:1fr}}
 
-    /* MODO DESLOGADO: esconde sidebar e centra login */
     body.unauth .app{grid-template-columns:1fr}
     body.unauth .side{display:none}
     body.unauth .main{max-width:980px;margin:0 auto}
@@ -47,7 +44,9 @@
       background:linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.10)), rgba(0,0,0,0.10);
       backdrop-filter: blur(14px);
     }
-    @media (max-width:980px){.side{position:relative;height:auto;border-right:none;border-bottom:1px solid rgba(255,255,255,0.10)}}
+    @media (max-width:980px){
+      .side{position:relative;height:auto;border-right:none;border-bottom:1px solid rgba(255,255,255,0.10)}
+    }
 
     .brand{
       display:flex;align-items:center;gap:10px;padding:12px 12px;
@@ -141,6 +140,7 @@
     .toast .x{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,0.16);color:rgba(255,255,255,0.85);border-radius:10px;padding:6px 8px;cursor:pointer}
   </style>
 </head>
+
 <body class="unauth">
 <div class="app">
   <aside class="side">
@@ -162,13 +162,12 @@
 
     <div class="who" style="margin-top:10px; opacity:.9">
       <div class="muted" style="font-size:11px; line-height:1.3">
-        Ordem: <b>Serviços</b> → <b>Dias disponíveis</b> → <b>Finalizar</b>.
+        Ordem: <b>Serviços</b> → <b>Dias disponíveis</b> → <b>Agendamentos online</b> → <b>Finalizar</b>.
       </div>
     </div>
   </aside>
 
   <main class="main">
-    <!-- Topbar só aparece logado -->
     <div class="topbar hidden" id="topbar">
       <div class="title">
         <div class="h" id="pageTitle">Dashboard</div>
@@ -180,7 +179,7 @@
       </div>
     </div>
 
-    <!-- LOGIN: único bloco visível deslogado -->
+    <!-- LOGIN -->
     <section class="card" id="loginSection">
       <div class="cardhead">
         <div>
@@ -209,7 +208,7 @@
       </div>
     </section>
 
-    <!-- RESTO DO PAINEL: começa TUDO escondido -->
+    <!-- DASH -->
     <section class="card hidden" id="dashSection">
       <div class="cardhead">
         <div>
@@ -232,13 +231,14 @@
           </div>
           <div class="card stat big">
             <div class="k">Atalhos</div>
-            <div class="v small">Serviços → Dias disponíveis → Atendimentos ✅</div>
+            <div class="v small">Serviços → Dias disponíveis → Agendamentos online → Finalizar ✅</div>
             <div class="help">O público só enxerga horários com <b>public=true</b> e <b>reserved=false</b>.</div>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- CLIENTES -->
     <section class="card hidden" id="clientsSection">
       <div class="cardhead">
         <div>
@@ -259,6 +259,7 @@
       </div>
     </section>
 
+    <!-- SERVIÇOS -->
     <section class="card hidden" id="servicesSection">
       <div class="cardhead">
         <div>
@@ -281,6 +282,7 @@
       </div>
     </section>
 
+    <!-- DIAS DISPONÍVEIS -->
     <section class="card hidden" id="availSection">
       <div class="cardhead">
         <div>
@@ -304,6 +306,24 @@
       </div>
     </section>
 
+    <!-- NOVA ABA: AGENDAMENTOS ONLINE -->
+    <section class="card hidden" id="onlineSection">
+      <div class="cardhead">
+        <div>
+          <h2 class="h2">Agendamentos online</h2>
+          <div class="p2">Pedidos recebidos do site público (nome, contato, serviço e horário)</div>
+        </div>
+        <div class="badge neon">Clique em “Finalizar pedido” para ir direto na tela de finalização</div>
+      </div>
+      <div class="cardbody">
+        <div class="help">
+          Aqui aparecem automaticamente os agendamentos criados pelo público. Quando finalizar, o status vira <b>DONE</b>.
+        </div>
+        <div class="list" id="o_list"></div>
+      </div>
+    </section>
+
+    <!-- AGENDA FUTURA (manual) -->
     <section class="card hidden" id="bookSection">
       <div class="cardhead">
         <div>
@@ -326,6 +346,7 @@
       </div>
     </section>
 
+    <!-- FINALIZAR -->
     <section class="card hidden" id="finalSection">
       <div class="cardhead">
         <div>
@@ -354,6 +375,7 @@
       </div>
     </section>
 
+    <!-- FIDELIDADE -->
     <section class="card hidden" id="loySection">
       <div class="cardhead">
         <div>
@@ -381,7 +403,10 @@
   const SUPABASE_ANON_KEY = "sb_publishable_gML-mbcOr6nCQt-bNcQIWg_A9SHi38v";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  // Ajuste aqui para o seu GitHub Pages
   const PUBLIC_URL = "https://luanprjfh-ops.github.io/EduardarNaisl/";
+  // Se o seu admin tiver outro nome, altere abaixo:
+  const ADMIN_FILE = "Admin.html";
   // ===============================
 
   const $ = (id)=>document.getElementById(id);
@@ -389,13 +414,14 @@
   const num = (v)=> Number(String(v||"0").replace(",", ".") || 0);
 
   const PAGES = [
-    { id:"dashSection",    title:"Dashboard",       sub:"Resumo de atendimentos e lucro" },
-    { id:"clientsSection", title:"Clientes",        sub:"Cadastrar e buscar clientes" },
-    { id:"servicesSection",title:"Serviços",        sub:"Preço, custo e lucro por serviço" },
-    { id:"availSection",   title:"Dias disponíveis",sub:"Publicar horários no site público" },
-    { id:"bookSection",    title:"Agenda futura",   sub:"Registrar futuras unhas e lucro esperado" },
-    { id:"finalSection",   title:"Finalizar unha",  sub:"Registrar atendimento feito e fidelidade" },
-    { id:"loySection",     title:"Fidelidade",      sub:"Ver pontos por cliente" },
+    { id:"dashSection",    title:"Dashboard",          sub:"Resumo de atendimentos e lucro" },
+    { id:"clientsSection", title:"Clientes",           sub:"Cadastrar e buscar clientes" },
+    { id:"servicesSection",title:"Serviços",           sub:"Preço, custo e lucro por serviço" },
+    { id:"availSection",   title:"Dias disponíveis",   sub:"Publicar horários no site público" },
+    { id:"onlineSection",  title:"Agendamentos online",sub:"Pedidos recebidos do site público" },
+    { id:"bookSection",    title:"Agenda futura",      sub:"Registrar futuras unhas e lucro esperado" },
+    { id:"finalSection",   title:"Finalizar unha",     sub:"Registrar atendimento feito e fidelidade" },
+    { id:"loySection",     title:"Fidelidade",         sub:"Ver pontos por cliente" },
   ];
 
   function toast(type, title, text){
@@ -420,9 +446,7 @@
   }
 
   function setPage(id){
-    // segurança: só navega se estiver logado
     if(!CACHE.user) return;
-
     for(const p of PAGES){
       $(p.id).classList.toggle("hidden", p.id !== id);
     }
@@ -455,7 +479,7 @@
 
   // Links úteis
   $("btnOpenPublic").onclick = ()=> window.open(PUBLIC_URL, "_blank");
-  $("btnOpenAdmin").onclick = ()=> toast("warn","Link do Admin","Abra: " + PUBLIC_URL + "Admin.html");
+  $("btnOpenAdmin").onclick  = ()=> window.open(PUBLIC_URL + ADMIN_FILE, "_blank");
 
   let CACHE = { user:null, clients:[], services:[], bookings:[] };
 
@@ -466,7 +490,6 @@
   }
 
   function applyAuthUI(user){
-    // Modo deslogado: só login, sem sidebar/topbar/páginas
     document.body.classList.toggle("unauth", !user);
 
     $("loginSection").classList.toggle("hidden", !!user);
@@ -475,11 +498,9 @@
     if(!user){
       $("who").textContent = "Deslogado";
       hideAllPages();
-      // remove active do menu
       document.querySelectorAll(".navbtn").forEach(b=>b.classList.remove("active"));
       return;
     }
-
     $("who").textContent = `Logado: ${user.email}`;
   }
 
@@ -497,10 +518,7 @@
     if(!email) return toast("warn","Informe o email","Digite o email e tente novamente.");
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: {
-        // GitHub Pages está em /EduardarNaisl/; redirecione sempre para o Admin.html correto
-        emailRedirectTo: PUBLIC_URL + "Admin.html"
-      }
+      options: { emailRedirectTo: PUBLIC_URL + ADMIN_FILE }
     });
     if(error) return toast("err","Falha ao enviar link", error.message);
     toast("ok","Link enviado","Confira o email para entrar.");
@@ -546,7 +564,7 @@
       .select("id,start_at,status,expected_price,expected_cost,client_id,service_id")
       .eq("owner_id", user.id)
       .order("start_at", { ascending:true });
-    if(error){ toast("err","Agenda futura", error.message); return []; }
+    if(error){ toast("err","Agendamentos", error.message); return []; }
     CACHE.bookings = data || [];
     return CACHE.bookings;
   }
@@ -761,15 +779,17 @@
   window.toggleAvail = toggleAvail; window.delAvail = delAvail;
   $("a_add").onclick = addAvail;
 
+  // ======= AGENDA FUTURA (LISTA) — agora mostra telefone também =======
   function renderBookingsList(rows){
     $("b_list").innerHTML = rows.map(b=>{
       const c = clientById(b.client_id), s = serviceById(b.service_id);
       const dt = new Date(b.start_at).toLocaleString();
       const exp = Number(b.expected_price||0) - Number(b.expected_cost||0);
+      const phone = c?.phone ? ` • ${c.phone}` : "";
       return `
         <div class="item">
           <div>
-            <div class="t">${dt} • ${(c?.name||"Cliente")} • ${(s?.name||"Serviço")}</div>
+            <div class="t">${dt} • ${(c?.name||"Cliente")}${phone} • ${(s?.name||"Serviço")}</div>
             <div class="m">
               Status: <span class="badge ${b.status==="SCHEDULED" ? "neon" : ""}">${b.status}</span>
               • Previsto: ${money(b.expected_price)} • Custo: ${money(b.expected_cost)} • Lucro: ${money(exp)}
@@ -781,6 +801,53 @@
         </div>`;
     }).join("") || `<div class="muted">Nenhum agendamento.</div>`;
   }
+
+  // ======= NOVA ABA: AGENDAMENTOS ONLINE =======
+  // Como o público grava em "bookings" e cria/usa "clients",
+  // basta listar os bookings SCHEDULED aqui e oferecer botão para finalizar.
+  function renderOnlineBookings(){
+    const rows = CACHE.bookings
+      .filter(b => b.status === "SCHEDULED")
+      .slice(0, 300);
+
+    $("o_list").innerHTML = rows.map(b=>{
+      const c = clientById(b.client_id), s = serviceById(b.service_id);
+      const dt = new Date(b.start_at).toLocaleString();
+      const phone = c?.phone ? c.phone : "-";
+      return `
+        <div class="item">
+          <div>
+            <div class="t">${dt} • ${(c?.name||"Cliente")} • ${(s?.name||"Serviço")}</div>
+            <div class="m">
+              Contato: <b>${phone}</b>
+              • Status: <span class="badge neon">${b.status}</span>
+              • Previsto: ${money(b.expected_price)} (custo ${money(b.expected_cost)})
+            </div>
+          </div>
+          <div class="right">
+            <button class="btn" onclick="goFinalize('${b.id}')">Finalizar pedido</button>
+            <button class="btn danger" onclick="cancelBooking('${b.id}')">Cancelar</button>
+          </div>
+        </div>
+      `;
+    }).join("") || `<div class="muted">Nenhum agendamento online no momento.</div>`;
+  }
+
+  // Vai para a tela "Finalizar unha" já carregando o agendamento escolhido
+  async function goFinalize(bookingId){
+    try{
+      setPage("finalSection");
+      await refreshAll(); // garante selects atualizados
+
+      $("f_booking").value = bookingId;
+      $("f_useBooking").click(); // preenche cliente/serviço/valores
+
+      toast("ok","Finalizar pedido","Agendamento carregado. Complete e clique em Finalizar.");
+    }catch(e){
+      toast("err","Finalizar pedido", e?.message || String(e));
+    }
+  }
+  window.goFinalize = goFinalize;
 
   async function addBooking(){
     const user = CACHE.user;
@@ -799,6 +866,7 @@
     toast("ok","Agenda futura","Agendamento salvo!");
     await loadBookings();
     renderBookingsList(CACHE.bookings);
+    renderOnlineBookings();
     await refreshFinalizeBookingSelect();
     await renderDashboard();
   }
@@ -806,10 +874,11 @@
   async function cancelBooking(id){
     if(!confirm("Cancelar agendamento?")) return;
     const { error } = await sb.from("bookings").update({ status:"CANCELLED" }).eq("id", id);
-    if(error) return toast("err","Agenda futura", error.message);
+    if(error) return toast("err","Agendamentos", error.message);
 
     await loadBookings();
     renderBookingsList(CACHE.bookings);
+    renderOnlineBookings();
     await refreshFinalizeBookingSelect();
     await renderDashboard();
   }
@@ -824,11 +893,12 @@
   $("b_add").onclick = addBooking;
 
   async function refreshFinalizeBookingSelect(){
-    const scheduled = CACHE.bookings.filter(b=>b.status==="SCHEDULED").slice(0,200);
+    const scheduled = CACHE.bookings.filter(b=>b.status==="SCHEDULED").slice(0,300);
     $("f_booking").innerHTML = [`<option value="">(Opcional) Escolha um agendamento</option>`].concat(
       scheduled.map(b=>{
         const c = clientById(b.client_id), s = serviceById(b.service_id);
-        return `<option value="${b.id}">${new Date(b.start_at).toLocaleString()} • ${(c?.name||"Cliente")} • ${(s?.name||"Serviço")}</option>`;
+        const phone = c?.phone ? ` • ${c.phone}` : "";
+        return `<option value="${b.id}">${new Date(b.start_at).toLocaleString()} • ${(c?.name||"Cliente")}${phone} • ${(s?.name||"Serviço")}</option>`;
       })
     ).join("");
   }
@@ -888,8 +958,11 @@
 
     $("f_notes").value="";
     toast("ok","Finalizar","Atendimento registrado!");
+
     await loadBookings();
     await refreshFinalizeBookingSelect();
+    renderBookingsList(CACHE.bookings);
+    renderOnlineBookings();
     await renderDashboard();
     await renderLoyalty();
   }
@@ -923,30 +996,36 @@
 
     if(!CACHE.user) return;
 
-    // Constrói menu só quando logado (evita mostrar deslogado)
     if(!$("nav").dataset.ready){
       buildNav();
       $("nav").dataset.ready = "1";
     }
 
-    // se não tiver página ativa, manda dashboard
     const active = document.querySelector(".navbtn.active")?.dataset?.target || "dashSection";
     setPage(active);
 
-    await loadClients(); await loadServices(); await loadBookings();
+    await loadClients();
+    await loadServices();
+    await loadBookings();
 
-    fillClientSelect("b_client"); fillClientSelect("f_client");
-    fillServiceSelect("a_service"); fillServiceSelect("b_service"); fillServiceSelect("f_service");
+    fillClientSelect("b_client");
+    fillClientSelect("f_client");
+    fillServiceSelect("a_service");
+    fillServiceSelect("b_service");
+    fillServiceSelect("f_service");
 
-    renderClients(); renderServices();
+    renderClients();
+    renderServices();
     await renderAvailability();
+
     renderBookingsList(CACHE.bookings);
+    renderOnlineBookings();
     await refreshFinalizeBookingSelect();
     await renderLoyalty();
     await renderDashboard();
   }
 
-  // PRIMEIRA CARGA: não mostra nada do painel até saber se está logado
+  // Primeira carga
   hideAllPages();
   refreshAll();
 </script>
