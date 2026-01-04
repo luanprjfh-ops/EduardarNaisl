@@ -28,7 +28,6 @@
         linear-gradient(135deg, var(--bg0), var(--bg2), var(--bg3));
       overflow-x:hidden;
     }
-
     .hidden{display:none !important}
 
     .app{min-height:100%;display:grid;grid-template-columns:280px 1fr}
@@ -202,7 +201,7 @@
             <button class="btn ghost" id="magicBtn" title="Envia link para entrar sem senha">Magic Link</button>
           </div>
           <div class="col-12">
-            <div class="help">Se esquecer a senha, use “Send password recovery” no Supabase. (O link abre o site, mas a sessão é aplicada.)</div>
+            <div class="help">Dica: se abrir o link dentro do app do Gmail e não logar, clique em “Abrir no navegador”.</div>
           </div>
         </div>
       </div>
@@ -306,18 +305,18 @@
       </div>
     </section>
 
-    <!-- NOVA ABA: AGENDAMENTOS ONLINE -->
+    <!-- AGENDAMENTOS ONLINE -->
     <section class="card hidden" id="onlineSection">
       <div class="cardhead">
         <div>
           <h2 class="h2">Agendamentos online</h2>
           <div class="p2">Pedidos recebidos do site público (nome, contato, serviço e horário)</div>
         </div>
-        <div class="badge neon">Clique em “Finalizar pedido” para ir direto na tela de finalização</div>
+        <div class="badge neon">Use “Finalizar pedido” para ir direto na tela de finalização</div>
       </div>
       <div class="cardbody">
         <div class="help">
-          Aqui aparecem automaticamente os agendamentos criados pelo público. Quando finalizar, o status vira <b>DONE</b>.
+          Aqui aparecem automaticamente os agendamentos criados pelo público. Ao finalizar, o status vira <b>DONE</b>.
         </div>
         <div class="list" id="o_list"></div>
       </div>
@@ -401,11 +400,18 @@
   // ===== CONFIG (suas infos) =====
   const SUPABASE_URL = "https://gmbonkieasgtfcevlsos.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_gML-mbcOr6nCQt-bNcQIWg_A9SHi38v";
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // IMPORTANTE: forçar persistência e detectar sessão na URL
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
 
   // Ajuste aqui para o seu GitHub Pages
   const PUBLIC_URL = "https://luanprjfh-ops.github.io/EduardarNaisl/";
-  // Se o seu admin tiver outro nome, altere abaixo:
   const ADMIN_FILE = "Admin.html";
   // ===============================
 
@@ -414,14 +420,14 @@
   const num = (v)=> Number(String(v||"0").replace(",", ".") || 0);
 
   const PAGES = [
-    { id:"dashSection",    title:"Dashboard",          sub:"Resumo de atendimentos e lucro" },
-    { id:"clientsSection", title:"Clientes",           sub:"Cadastrar e buscar clientes" },
-    { id:"servicesSection",title:"Serviços",           sub:"Preço, custo e lucro por serviço" },
-    { id:"availSection",   title:"Dias disponíveis",   sub:"Publicar horários no site público" },
-    { id:"onlineSection",  title:"Agendamentos online",sub:"Pedidos recebidos do site público" },
-    { id:"bookSection",    title:"Agenda futura",      sub:"Registrar futuras unhas e lucro esperado" },
-    { id:"finalSection",   title:"Finalizar unha",     sub:"Registrar atendimento feito e fidelidade" },
-    { id:"loySection",     title:"Fidelidade",         sub:"Ver pontos por cliente" },
+    { id:"dashSection",    title:"Dashboard",           sub:"Resumo de atendimentos e lucro" },
+    { id:"clientsSection", title:"Clientes",            sub:"Cadastrar e buscar clientes" },
+    { id:"servicesSection",title:"Serviços",            sub:"Preço, custo e lucro por serviço" },
+    { id:"availSection",   title:"Dias disponíveis",    sub:"Publicar horários no site público" },
+    { id:"onlineSection",  title:"Agendamentos online", sub:"Pedidos recebidos do site público" },
+    { id:"bookSection",    title:"Agenda futura",       sub:"Registrar futuras unhas e lucro esperado" },
+    { id:"finalSection",   title:"Finalizar unha",      sub:"Registrar atendimento feito e fidelidade" },
+    { id:"loySection",     title:"Fidelidade",          sub:"Ver pontos por cliente" },
   ];
 
   function toast(type, title, text){
@@ -483,6 +489,50 @@
 
   let CACHE = { user:null, clients:[], services:[], bookings:[] };
 
+  // ====== FIX DO MAGIC LINK / REDIRECT ======
+  async function handleAuthRedirect(){
+    const url = new URL(window.location.href);
+    const qs = url.searchParams;
+
+    const token_hash = qs.get("token_hash");
+    const type = qs.get("type"); // magiclink / recovery / invite
+    const code = qs.get("code");
+
+    // Caso 1: Magic Link (token_hash + type)
+    if(token_hash && type){
+      const { error } = await sb.auth.verifyOtp({ type, token_hash });
+      if(error){
+        toast("err","Magic Link", error.message);
+      }else{
+        toast("ok","Magic Link","Sessão aplicada com sucesso.");
+      }
+      qs.delete("token_hash");
+      qs.delete("type");
+      qs.delete("redirect_to");
+      window.history.replaceState({}, document.title, url.pathname + (qs.toString() ? ("?" + qs.toString()) : ""));
+    }
+
+    // Caso 2: PKCE (code)
+    if(code){
+      const { error } = await sb.auth.exchangeCodeForSession(code);
+      if(error){
+        toast("err","Login (code)", error.message);
+      }else{
+        toast("ok","Login","Sessão aplicada com sucesso.");
+      }
+      qs.delete("code");
+      qs.delete("next");
+      window.history.replaceState({}, document.title, url.pathname + (qs.toString() ? ("?" + qs.toString()) : ""));
+    }
+
+    // Se tiver erro na URL (alguns casos)
+    const errDesc = qs.get("error_description");
+    if(errDesc){
+      toast("err","Auth", decodeURIComponent(errDesc));
+    }
+  }
+  // ==========================================
+
   async function loadUser(){
     const { data: { user } } = await sb.auth.getUser();
     CACHE.user = user;
@@ -516,12 +566,14 @@
   $("magicBtn").onclick = async ()=>{
     const email = $("email").value.trim();
     if(!email) return toast("warn","Informe o email","Digite o email e tente novamente.");
+
     const { error } = await sb.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: PUBLIC_URL + ADMIN_FILE }
     });
+
     if(error) return toast("err","Falha ao enviar link", error.message);
-    toast("ok","Link enviado","Confira o email para entrar.");
+    toast("ok","Link enviado","Abra o link no mesmo dispositivo/navegador onde quer ficar logado.");
   };
 
   $("logoutBtn").onclick = async ()=>{
@@ -779,7 +831,7 @@
   window.toggleAvail = toggleAvail; window.delAvail = delAvail;
   $("a_add").onclick = addAvail;
 
-  // ======= AGENDA FUTURA (LISTA) — agora mostra telefone também =======
+  // ======= AGENDA FUTURA (LISTA) =======
   function renderBookingsList(rows){
     $("b_list").innerHTML = rows.map(b=>{
       const c = clientById(b.client_id), s = serviceById(b.service_id);
@@ -802,9 +854,7 @@
     }).join("") || `<div class="muted">Nenhum agendamento.</div>`;
   }
 
-  // ======= NOVA ABA: AGENDAMENTOS ONLINE =======
-  // Como o público grava em "bookings" e cria/usa "clients",
-  // basta listar os bookings SCHEDULED aqui e oferecer botão para finalizar.
+  // ======= AGENDAMENTOS ONLINE =======
   function renderOnlineBookings(){
     const rows = CACHE.bookings
       .filter(b => b.status === "SCHEDULED")
@@ -833,15 +883,15 @@
     }).join("") || `<div class="muted">Nenhum agendamento online no momento.</div>`;
   }
 
-  // Vai para a tela "Finalizar unha" já carregando o agendamento escolhido
   async function goFinalize(bookingId){
     try{
       setPage("finalSection");
-      await refreshAll(); // garante selects atualizados
+      // NÃO chama refreshAll completo aqui (evita flicker); só garante dropdown atualizado:
+      await loadBookings();
+      await refreshFinalizeBookingSelect();
 
       $("f_booking").value = bookingId;
-      $("f_useBooking").click(); // preenche cliente/serviço/valores
-
+      $("f_useBooking").click();
       toast("ok","Finalizar pedido","Agendamento carregado. Complete e clique em Finalizar.");
     }catch(e){
       toast("err","Finalizar pedido", e?.message || String(e));
@@ -991,6 +1041,10 @@
   $("l_search").oninput = renderLoyalty;
 
   async function refreshAll(){
+    // 1) aplica sessão se veio do link
+    await handleAuthRedirect();
+
+    // 2) carrega usuário
     await loadUser();
     applyAuthUI(CACHE.user);
 
